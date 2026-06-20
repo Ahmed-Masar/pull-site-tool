@@ -2,3 +2,4 @@
 sites
 __pycache__
 *.pyc
+.claude

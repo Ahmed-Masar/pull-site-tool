@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Site Mirror</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page">
+    <section class="card">
+      <p class="eyebrow">Framer Site Tool</p>
+      <h1 class="title">Pull &amp; Clean</h1>
+      <p class="subtitle">Mirror a Framer site, sanitize it, and validate every link.</p>
+
+      <form id="pull-form" class="form">
+        <div class="field">
+          <label for="url">Site URL</label>
+          <input type="url" id="url" name="url" placeholder="https://example.framer.website/" required>
+        </div>
+        <div class="field">
+          <label for="project_name">Project Name <span class="optional">optional</span></label>
+          <input type="text" id="project_name" name="project_name" placeholder="auto-generated from domain">
+        </div>
+        <button type="submit" class="btn btn-primary" id="submit-btn">Pull Site</button>
+      </form>
+
+      <div class="progress" id="progress" hidden>
+        <div class="progress-track"><div class="progress-bar"></div></div>
+        <p class="progress-stage" id="progress-stage">Queued&hellip;</p>
+      </div>
+
+      <div class="report" id="report" hidden>
+        <div class="report-status" id="report-status"></div>
+        <ul class="report-list" id="report-list"></ul>
+        <div class="report-issues" id="report-issues" hidden></div>
+        <div class="report-actions">
+          <a href="#" target="_blank" rel="noopener" class="btn btn-outline" id="preview-link">Open Preview &#8599;</a>
+          <button type="button" class="btn btn-text" id="reset-btn">Run Another</button>
+        </div>
+      </div>
+
+      <p class="error" id="error-msg" hidden></p>
+    </section>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
