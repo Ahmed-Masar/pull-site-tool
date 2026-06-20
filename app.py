@@ -34,8 +34,13 @@ jobs_lock = threading.Lock()
 def _run_job(job_id, url, project_name):
     with jobs_lock:
         jobs[job_id]["status"] = "running"
+
+    def log(stage):
+        with jobs_lock:
+            jobs[job_id]["stage"] = stage
+
     try:
-        report = pull_site.run_pipeline(url, project_name, SITES_DIR)
+        report = pull_site.run_pipeline(url, project_name, SITES_DIR, log=log)
         with jobs_lock:
             jobs[job_id]["status"] = "done"
             jobs[job_id]["report"] = report
@@ -43,6 +48,14 @@ def _run_job(job_id, url, project_name):
         with jobs_lock:
             jobs[job_id]["status"] = "failed"
             jobs[job_id]["error"] = str(e)
+
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    return response
 
 
 @app.post("/api/pull-site")
@@ -58,7 +71,7 @@ def pull_site_endpoint():
 
     job_id = uuid.uuid4().hex
     with jobs_lock:
-        jobs[job_id] = {"status": "pending", "url": url, "project_name": project_name}
+        jobs[job_id] = {"status": "pending", "stage": "queued", "url": url, "project_name": project_name}
 
     thread = threading.Thread(target=_run_job, args=(job_id, url, project_name), daemon=True)
     thread.start()
