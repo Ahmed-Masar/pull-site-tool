@@ -11,7 +11,7 @@
     <section class="card" id="card">
       <header class="card-head">
         <p class="eyebrow">Framer Site Tool</p>
-        <h1 class="title">Pull <em>&amp;</em> Clean</h1>
+        <h1 class="title">Pull And Clean</h1>
         <p class="subtitle">Mirror a Framer site, sanitize it, and validate every link.</p>
       </header>
 
@@ -39,6 +39,7 @@
         <div class="report-issues" id="report-issues" hidden></div>
         <div class="report-actions">
           <a href="#" target="_blank" rel="noopener" class="btn btn-outline" id="preview-link">Open Preview &#8599;</a>
+          <button type="button" class="btn btn-outline" id="github-btn">Push to GitHub</button>
           <button type="button" class="btn btn-text" id="reset-btn">Run Another</button>
         </div>
       </div>
@@ -48,6 +49,48 @@
       <footer class="card-foot">Mirrors, sanitizes, and validates Framer-published sites.</footer>
     </section>
   </main>
+
+  <div class="modal-overlay" id="github-modal" hidden>
+    <div class="modal">
+      <button type="button" class="modal-close" id="github-modal-close" aria-label="Close">&times;</button>
+
+      <div class="modal-step" id="github-step-select">
+        <h2 class="modal-title">Select a Repository</h2>
+        <p class="modal-text" id="github-select-hint">Loading your GitHub repositories&hellip;</p>
+        <select class="repo-select" id="github-repo-select" hidden></select>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-text" id="github-cancel-1">Cancel</button>
+          <button type="button" class="btn btn-primary" id="github-continue-btn" disabled>Continue</button>
+        </div>
+      </div>
+
+      <div class="modal-step" id="github-step-confirm" hidden>
+        <h2 class="modal-title">Confirm Push</h2>
+        <p class="modal-text">Force-push <strong id="github-confirm-project"></strong> to:</p>
+        <p class="modal-repo-name" id="github-confirm-repo"></p>
+        <p class="modal-warn">This will permanently overwrite the current content of this repository.</p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-text" id="github-cancel-2">Cancel</button>
+          <button type="button" class="btn btn-primary" id="github-push-btn">Force-Push</button>
+        </div>
+      </div>
+
+      <div class="modal-step" id="github-step-progress" hidden>
+        <div class="spinner"></div>
+        <p class="modal-text" id="github-progress-stage">Pushing&hellip;</p>
+      </div>
+
+      <div class="modal-step" id="github-step-result" hidden>
+        <div class="report-status" id="github-result-status"></div>
+        <p class="modal-text" id="github-result-text"></p>
+        <div class="modal-actions">
+          <a href="#" target="_blank" rel="noopener" class="btn btn-outline" id="github-result-link" hidden>View Repo &#8599;</a>
+          <button type="button" class="btn btn-text" id="github-close-btn">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="script.js"></script>
 </body>
 </html>

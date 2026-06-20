@@ -41,6 +41,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: var(--font-body);
@@ -377,6 +381,118 @@ body {
   letter-spacing: 0.04em;
   color: var(--gray-400);
   text-align: center;
+}
+
+/* github modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 10, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 100;
+  animation: fade 0.2s ease both;
+}
+
+.modal {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  background: var(--white);
+  border-radius: 24px;
+  padding: 40px 32px 32px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: rise 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  font-size: 18px;
+  color: var(--gray-400);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: var(--black);
+}
+
+.modal-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 650;
+  margin: 0 0 14px;
+}
+
+.modal-text {
+  font-size: 13px;
+  color: var(--gray-700);
+  line-height: 1.6;
+  margin: 0 0 8px;
+}
+
+.modal-repo-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin: 0 0 14px;
+  word-break: break-all;
+}
+
+.modal-warn {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin: 0 0 4px;
+  line-height: 1.5;
+}
+
+.repo-select {
+  width: 100%;
+  padding: 14px 18px;
+  font-size: 13px;
+  border: 1px solid var(--gray-300);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--black);
+  font-family: inherit;
+  margin-top: 10px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+  justify-content: flex-end;
+}
+
+.modal-actions .btn-primary {
+  width: auto;
+  margin-top: 0;
+}
+
+.modal-step .spinner {
+  margin-bottom: 18px;
+}
+
+#github-step-progress,
+#github-step-result {
+  text-align: center;
+}
+
+#github-result-status {
+  justify-content: center;
 }
 
 @media (max-width: 480px) {

@@ -20,8 +20,32 @@ const previewLink = document.getElementById("preview-link");
 const resetBtn = document.getElementById("reset-btn");
 const errorEl = document.getElementById("error-msg");
 
+const githubBtn = document.getElementById("github-btn");
+const githubModal = document.getElementById("github-modal");
+const githubModalClose = document.getElementById("github-modal-close");
+const githubStepSelect = document.getElementById("github-step-select");
+const githubSelectHint = document.getElementById("github-select-hint");
+const githubRepoSelect = document.getElementById("github-repo-select");
+const githubCancel1 = document.getElementById("github-cancel-1");
+const githubContinueBtn = document.getElementById("github-continue-btn");
+const githubStepConfirm = document.getElementById("github-step-confirm");
+const githubConfirmProject = document.getElementById("github-confirm-project");
+const githubConfirmRepo = document.getElementById("github-confirm-repo");
+const githubCancel2 = document.getElementById("github-cancel-2");
+const githubPushBtn = document.getElementById("github-push-btn");
+const githubStepProgress = document.getElementById("github-step-progress");
+const githubProgressStage = document.getElementById("github-progress-stage");
+const githubStepResult = document.getElementById("github-step-result");
+const githubResultStatus = document.getElementById("github-result-status");
+const githubResultText = document.getElementById("github-result-text");
+const githubResultLink = document.getElementById("github-result-link");
+const githubCloseBtn = document.getElementById("github-close-btn");
+
 let pollTimer = null;
 let pollFailures = 0;
+let pushPollTimer = null;
+let lastReport = null;
+let githubRepos = [];
 
 function showError(msg) {
   errorEl.textContent = msg;
@@ -41,6 +65,7 @@ function resetUI() {
   reportListEl.innerHTML = "";
   reportIssuesEl.innerHTML = "";
   reportIssuesEl.hidden = true;
+  closeGithubModal();
 }
 
 function addRow(label, value) {
@@ -67,6 +92,7 @@ function renderReport(job) {
     setStatusGlyph(false, "Job failed");
     addRow("Error", job.error || "Unknown error");
     previewLink.style.display = "none";
+    githubBtn.style.display = "none";
     return;
   }
 
@@ -76,8 +102,12 @@ function renderReport(job) {
     setStatusGlyph(false, "Download failed");
     addRow("Error", report.error);
     previewLink.style.display = "none";
+    githubBtn.style.display = "none";
     return;
   }
+
+  lastReport = { project_name: report.project_name, url: report.url };
+  githubBtn.style.display = "";
 
   setStatusGlyph(report.success, report.success ? "Completed successfully" : "Completed with issues");
 
@@ -206,3 +236,123 @@ form.addEventListener("submit", (e) => {
 });
 
 resetBtn.addEventListener("click", resetUI);
+
+function showGithubStep(stepEl) {
+  [githubStepSelect, githubStepConfirm, githubStepProgress, githubStepResult].forEach((el) => {
+    el.hidden = el !== stepEl;
+  });
+}
+
+function closeGithubModal() {
+  if (pushPollTimer) clearInterval(pushPollTimer);
+  githubModal.hidden = true;
+  githubRepoSelect.hidden = true;
+  githubRepoSelect.innerHTML = "";
+  githubContinueBtn.disabled = true;
+  githubSelectHint.textContent = "Loading your GitHub repositories…";
+  githubResultLink.hidden = true;
+  githubRepos = [];
+}
+
+async function openGithubModal() {
+  if (!lastReport) return;
+  githubModal.hidden = false;
+  showGithubStep(githubStepSelect);
+
+  try {
+    const res = await fetch(`${API_BASE}/api/github/repos`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+
+    githubRepos = data.repos || [];
+    if (githubRepos.length === 0) {
+      githubSelectHint.textContent = "No repositories found on this GitHub account.";
+      return;
+    }
+
+    githubSelectHint.textContent = "Choose the repository to push this project to:";
+    githubRepoSelect.innerHTML = githubRepos
+      .map((r, i) => `<option value="${i}">${r.full_name}${r.private ? " (private)" : " (public)"}</option>`)
+      .join("");
+    githubRepoSelect.hidden = false;
+    githubContinueBtn.disabled = false;
+  } catch (err) {
+    githubSelectHint.textContent = `Could not load repositories: ${err.message}`;
+  }
+}
+
+githubBtn.addEventListener("click", openGithubModal);
+githubModalClose.addEventListener("click", closeGithubModal);
+githubCancel1.addEventListener("click", closeGithubModal);
+githubCancel2.addEventListener("click", closeGithubModal);
+githubCloseBtn.addEventListener("click", closeGithubModal);
+
+githubContinueBtn.addEventListener("click", () => {
+  const repo = githubRepos[Number(githubRepoSelect.value)];
+  if (!repo) return;
+
+  githubConfirmProject.textContent = lastReport.project_name;
+  githubConfirmRepo.textContent = repo.full_name;
+  showGithubStep(githubStepConfirm);
+});
+
+async function pollPushStatus(jobId, repoFullName) {
+  try {
+    const res = await fetch(`${API_BASE}/api/push-status/${jobId}`);
+    if (!res.ok) throw new Error(`Status check failed (${res.status})`);
+    const job = await res.json();
+
+    if (job.status === "pending" || job.status === "running") {
+      githubProgressStage.textContent = job.stage || "Working…";
+      return;
+    }
+
+    clearInterval(pushPollTimer);
+    showGithubStep(githubStepResult);
+
+    if (job.status === "done") {
+      githubResultStatus.innerHTML = `<span class="glyph">&#10003;</span><span class="text">Pushed successfully</span>`;
+      githubResultText.textContent = `${lastReport.project_name} was force-pushed to ${repoFullName}.`;
+      githubResultLink.href = job.repo_url;
+      githubResultLink.hidden = false;
+    } else {
+      githubResultStatus.innerHTML = `<span class="glyph">&times;</span><span class="text">Push failed</span>`;
+      githubResultText.textContent = job.error || "Unknown error";
+    }
+  } catch (err) {
+    clearInterval(pushPollTimer);
+    showGithubStep(githubStepResult);
+    githubResultStatus.innerHTML = `<span class="glyph">&times;</span><span class="text">Push failed</span>`;
+    githubResultText.textContent = err.message;
+  }
+}
+
+githubPushBtn.addEventListener("click", async () => {
+  const repo = githubRepos[Number(githubRepoSelect.value)];
+  if (!repo || !lastReport) return;
+
+  showGithubStep(githubStepProgress);
+  githubProgressStage.textContent = "Starting…";
+
+  try {
+    const res = await fetch(`${API_BASE}/api/push-to-github`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        project_name: lastReport.project_name,
+        url: lastReport.url,
+        repo: repo.full_name,
+        default_branch: repo.default_branch,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+
+    pushPollTimer = setInterval(() => pollPushStatus(data.job_id, repo.full_name), 1500);
+    pollPushStatus(data.job_id, repo.full_name);
+  } catch (err) {
+    showGithubStep(githubStepResult);
+    githubResultStatus.innerHTML = `<span class="glyph">&times;</span><span class="text">Push failed</span>`;
+    githubResultText.textContent = err.message;
+  }
+});

@@ -3,17 +3,24 @@
 app.py - Flask API wrapping pull_site.py's download+cleanup pipeline.
 
 Endpoints:
-    POST /api/pull-site        {"url": "...", "project_name": "..."} -> starts a background job
-    GET  /api/status/<job_id>  -> job status + report once finished
-    GET  /preview/<project>/   -> serves the cleaned mirror for manual browsing
-    GET  /healthz               -> health check
+    POST /api/pull-site             {"url": "...", "project_name": "..."} -> starts a background job
+    GET  /api/status/<job_id>       -> job status + report once finished
+    GET  /api/github/repos          -> lists repos on the account owning GITHUB_TOKEN
+    POST /api/push-to-github        {"project_name", "repo", "default_branch", "url"} -> starts a background push job
+    GET  /api/push-status/<job_id>  -> push job status
+    GET  /preview/<project>/        -> serves the cleaned mirror for manual browsing
+    GET  /healthz                    -> health check
 
 Note: jobs are kept in an in-memory dict, so this only works correctly behind
 a single process/worker (no horizontal scaling, no persistence across restarts).
 """
+import json
 import os
 import re
+import subprocess
 import threading
+import urllib.error
+import urllib.request
 import uuid
 
 from flask import Flask, abort, jsonify, request, send_from_directory
@@ -26,9 +33,17 @@ SITES_DIR = os.environ.get("SITES_DIR", os.path.join(os.path.dirname(os.path.abs
 os.makedirs(SITES_DIR, exist_ok=True)
 
 PROJECT_NAME_RE = re.compile(r'^[A-Za-z0-9_-]+$')
+REPO_FULL_NAME_RE = re.compile(r'^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?/[A-Za-z0-9._-]+$')
+
+GITHUB_API = "https://api.github.com"
+GIT_AUTHOR_NAME = "Pull Site Bot"
+GIT_AUTHOR_EMAIL = "bot@pullsite.app"
 
 jobs = {}
 jobs_lock = threading.Lock()
+
+push_jobs = {}
+push_jobs_lock = threading.Lock()
 
 
 def _run_job(job_id, url, project_name):
@@ -48,6 +63,81 @@ def _run_job(job_id, url, project_name):
         with jobs_lock:
             jobs[job_id]["status"] = "failed"
             jobs[job_id]["error"] = str(e)
+
+
+def _github_token():
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        raise RuntimeError("GITHUB_TOKEN is not configured on the server")
+    return token
+
+
+def _github_api_get(path, token):
+    req = urllib.request.Request(
+        f"{GITHUB_API}{path}",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "pull-site-tool",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", "replace")
+        raise RuntimeError(f"GitHub API error ({e.code}): {body[:200]}")
+
+
+def list_github_repos(token):
+    repos = []
+    page = 1
+    while page <= 5:
+        data = _github_api_get(f"/user/repos?affiliation=owner&per_page=100&page={page}&sort=updated", token)
+        if not data:
+            break
+        repos.extend(data)
+        if len(data) < 100:
+            break
+        page += 1
+    return [
+        {
+            "full_name": r["full_name"],
+            "private": r["private"],
+            "default_branch": r["default_branch"],
+            "updated_at": r["updated_at"],
+            "html_url": r["html_url"],
+        }
+        for r in repos
+    ]
+
+
+def push_project_to_github(project_dir, repo_full_name, default_branch, source_url, token, log=lambda msg: None):
+    mirror_root = pull_site.discover_mirror_root(project_dir)
+
+    def run(cmd):
+        result = subprocess.run(cmd, cwd=mirror_root, capture_output=True, text=True)
+        if result.returncode != 0:
+            stderr = result.stderr.replace(token, "***").strip()
+            raise RuntimeError(f"`{' '.join(cmd[:2])}` failed: {stderr}")
+        return result
+
+    log("Preparing git repository...")
+    if not os.path.isdir(os.path.join(mirror_root, ".git")):
+        run(["git", "init", "-q"])
+    run(["git", "checkout", "-B", default_branch])
+    run(["git", "add", "-A"])
+    run([
+        "git", "-c", f"user.name={GIT_AUTHOR_NAME}", "-c", f"user.email={GIT_AUTHOR_EMAIL}",
+        "commit", "-m", f"Pull & clean: {source_url}", "--allow-empty",
+    ])
+
+    log(f"Pushing to {repo_full_name}...")
+    remote_url = f"https://x-access-token:{token}@github.com/{repo_full_name}.git"
+    run(["git", "push", "--force", remote_url, f"HEAD:{default_branch}"])
+
+    return f"https://github.com/{repo_full_name}"
 
 
 @app.after_request
@@ -83,6 +173,82 @@ def pull_site_endpoint():
 def job_status(job_id):
     with jobs_lock:
         job = jobs.get(job_id)
+    if not job:
+        return jsonify(error="job not found"), 404
+    return jsonify(job)
+
+
+@app.get("/api/github/repos")
+def github_repos():
+    try:
+        token = _github_token()
+        repos = list_github_repos(token)
+    except RuntimeError as e:
+        return jsonify(error=str(e)), 502
+    return jsonify(repos=repos)
+
+
+def _run_push_job(job_id, project_name, repo_full_name, default_branch, source_url):
+    with push_jobs_lock:
+        push_jobs[job_id]["status"] = "running"
+
+    def log(stage):
+        with push_jobs_lock:
+            push_jobs[job_id]["stage"] = stage
+
+    try:
+        token = _github_token()
+        project_dir = os.path.join(SITES_DIR, project_name)
+        repo_url = push_project_to_github(project_dir, repo_full_name, default_branch, source_url, token, log=log)
+        with push_jobs_lock:
+            push_jobs[job_id]["status"] = "done"
+            push_jobs[job_id]["repo_url"] = repo_url
+    except Exception as e:
+        with push_jobs_lock:
+            push_jobs[job_id]["status"] = "failed"
+            push_jobs[job_id]["error"] = str(e)
+
+
+@app.post("/api/push-to-github")
+def push_to_github_endpoint():
+    data = request.get_json(silent=True) or {}
+    project_name = data.get("project_name")
+    repo_full_name = data.get("repo")
+    default_branch = data.get("default_branch") or "main"
+    source_url = data.get("url") or ""
+
+    if not project_name or not PROJECT_NAME_RE.match(project_name):
+        return jsonify(error="a valid project_name is required"), 400
+    if not repo_full_name or not REPO_FULL_NAME_RE.match(repo_full_name):
+        return jsonify(error="a valid repo ('owner/name') is required"), 400
+
+    project_dir = os.path.join(SITES_DIR, project_name)
+    if not os.path.isdir(project_dir):
+        return jsonify(error=f"project '{project_name}' not found"), 404
+
+    job_id = uuid.uuid4().hex
+    with push_jobs_lock:
+        push_jobs[job_id] = {
+            "status": "pending",
+            "stage": "queued",
+            "project_name": project_name,
+            "repo": repo_full_name,
+        }
+
+    thread = threading.Thread(
+        target=_run_push_job,
+        args=(job_id, project_name, repo_full_name, default_branch, source_url),
+        daemon=True,
+    )
+    thread.start()
+
+    return jsonify(job_id=job_id, status="started"), 202
+
+
+@app.get("/api/push-status/<job_id>")
+def push_status(job_id):
+    with push_jobs_lock:
+        job = push_jobs.get(job_id)
     if not job:
         return jsonify(error="job not found"), 404
     return jsonify(job)
