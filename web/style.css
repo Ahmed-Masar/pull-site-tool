@@ -1,13 +1,40 @@
+@font-face {
+  font-family: "SF Pro";
+  src: url("fonts/SF-Pro.woff2") format("woff2");
+  font-weight: 1 1000;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro";
+  src: url("fonts/SF-Pro-Italic.woff2") format("woff2");
+  font-weight: 1 1000;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Arabic";
+  src: url("fonts/SF-Arabic.woff2") format("woff2");
+  font-weight: 1 1000;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --black: #0a0a0a;
   --white: #ffffff;
-  --gray-50: #fafafa;
-  --gray-100: #f7f7f7;
-  --gray-200: #ececec;
-  --gray-300: #e0e0e0;
-  --gray-400: #bcbcbc;
+  --gray-50: #f4f4f4;
+  --gray-100: #f0f0f0;
+  --gray-200: #e6e6e6;
+  --gray-300: #d6d6d6;
+  --gray-400: #b0b0b0;
   --gray-500: #8a8a8a;
   --gray-700: #4a4a4a;
+
+  --font-display: "SF Pro", "SF Arabic", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-body: "SF Pro", "SF Arabic", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
 }
 
 * {
@@ -16,7 +43,7 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-family: var(--font-body);
   color: var(--black);
   background: var(--gray-50);
 }
@@ -31,39 +58,58 @@ body {
 
 .card {
   width: 100%;
-  max-width: 480px;
+  max-width: 520px;
   background: var(--white);
   border: 1px solid var(--gray-200);
-  border-radius: 6px;
-  padding: 56px 48px;
+  border-radius: 28px;
+  padding: 68px 56px 48px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.card-head {
+  margin-bottom: 44px;
 }
 
 .eyebrow {
   font-size: 11px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--gray-500);
-  margin: 0 0 12px;
+  margin: 0 0 18px;
   font-weight: 600;
 }
 
 .title {
-  font-size: 32px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  margin: 0 0 14px;
+  line-height: 1.05;
+}
+
+.title em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--gray-400);
 }
 
 .subtitle {
   font-size: 14px;
   color: var(--gray-700);
-  margin: 0 0 36px;
-  line-height: 1.5;
+  margin: 0;
+  line-height: 1.6;
+  max-width: 360px;
 }
 
 .field {
-  margin-bottom: 22px;
+  margin-bottom: 20px;
 }
 
 .field label {
@@ -72,7 +118,7 @@ body {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--gray-500);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   font-weight: 600;
 }
 
@@ -85,19 +131,20 @@ body {
 
 .field input {
   width: 100%;
-  padding: 12px 14px;
+  padding: 15px 22px;
   font-size: 14px;
   border: 1px solid var(--gray-300);
-  border-radius: 4px;
+  border-radius: 999px;
   background: var(--white);
   color: var(--black);
   font-family: inherit;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .field input:focus {
   outline: none;
   border-color: var(--black);
+  box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.06);
 }
 
 .field input::placeholder {
@@ -108,15 +155,16 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 13px 20px;
-  font-size: 13px;
+  padding: 16px 28px;
+  font-size: 12.5px;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  border-radius: 4px;
+  border-radius: 999px;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease,
+    transform 0.2s ease, box-shadow 0.2s ease;
   text-decoration: none;
   font-family: inherit;
 }
@@ -125,15 +173,25 @@ body {
   width: 100%;
   background: var(--black);
   color: var(--white);
+  margin-top: 8px;
 }
 
 .btn-primary:hover {
-  background: #262626;
+  background: #1f1f1f;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
 }
 
 .btn-primary:disabled {
-  background: var(--gray-400);
+  background: var(--gray-300);
+  color: var(--gray-500);
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .btn-outline {
@@ -154,70 +212,86 @@ body {
   text-transform: none;
   letter-spacing: 0;
   font-weight: 500;
-  padding: 13px 8px;
+  padding: 16px 8px;
 }
 
 .btn-text:hover {
   color: var(--black);
 }
 
+/* progress */
 .progress {
-  margin-top: 8px;
+  padding: 28px 0 8px;
+  text-align: center;
+  animation: fade 0.35s ease both;
 }
 
-.progress-track {
-  height: 2px;
-  background: var(--gray-200);
-  border-radius: 2px;
-  overflow: hidden;
-  position: relative;
+.spinner {
+  width: 26px;
+  height: 26px;
+  margin: 0 auto 22px;
+  border-radius: 50%;
+  border: 2px solid var(--gray-200);
+  border-top-color: var(--black);
+  animation: spin 0.85s linear infinite;
 }
 
-.progress-bar {
-  position: absolute;
-  top: 0;
-  left: -30%;
-  height: 100%;
-  width: 30%;
-  background: var(--black);
-  animation: indeterminate 1.4s ease-in-out infinite;
-}
-
-@keyframes indeterminate {
-  0% { left: -30%; }
-  100% { left: 100%; }
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .progress-stage {
-  margin-top: 16px;
+  margin: 0;
   font-size: 13px;
-  color: var(--gray-500);
+  color: var(--gray-700);
   letter-spacing: 0.02em;
+}
+
+.progress-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--gray-400);
+  letter-spacing: 0.01em;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.5;
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* report */
+.report {
+  animation: fade 0.35s ease both;
 }
 
 .report-status {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 24px;
+  gap: 12px;
+  margin-bottom: 28px;
 }
 
 .report-status .glyph {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   border: 1.5px solid var(--black);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 13px;
   flex-shrink: 0;
   line-height: 1;
 }
 
 .report-status .text {
-  font-size: 15px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
 }
 
 .report-list {
@@ -231,7 +305,7 @@ body {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  padding: 12px 0;
+  padding: 13px 0;
   border-bottom: 1px solid var(--gray-200);
   font-size: 13px;
 }
@@ -248,7 +322,7 @@ body {
 }
 
 .report-issues {
-  margin-top: 18px;
+  margin-top: 20px;
 }
 
 .report-issues h3 {
@@ -264,7 +338,7 @@ body {
   font-size: 12px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color: var(--black);
-  padding: 6px 0;
+  padding: 7px 0;
   border-bottom: 1px solid var(--gray-100);
   display: flex;
   gap: 8px;
@@ -277,7 +351,7 @@ body {
 .report-actions {
   display: flex;
   gap: 12px;
-  margin-top: 28px;
+  margin-top: 32px;
   align-items: center;
 }
 
@@ -286,17 +360,31 @@ body {
 }
 
 .error {
-  margin-top: 20px;
+  margin-top: 24px;
   font-size: 13px;
   color: var(--black);
   background: var(--gray-100);
   border: 1px solid var(--gray-200);
-  border-radius: 4px;
-  padding: 12px 14px;
+  border-radius: 16px;
+  padding: 14px 18px;
+}
+
+.card-foot {
+  margin-top: 44px;
+  padding-top: 24px;
+  border-top: 1px solid var(--gray-100);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--gray-400);
+  text-align: center;
 }
 
 @media (max-width: 480px) {
   .card {
-    padding: 40px 28px;
+    padding: 48px 28px 36px;
+    border-radius: 20px;
+  }
+  .title {
+    font-size: 36px;
   }
 }

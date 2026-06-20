@@ -3,15 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Site Mirror</title>
+<title>Pull &amp; Clean — Framer Site Tool</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main class="page">
-    <section class="card">
-      <p class="eyebrow">Framer Site Tool</p>
-      <h1 class="title">Pull &amp; Clean</h1>
-      <p class="subtitle">Mirror a Framer site, sanitize it, and validate every link.</p>
+    <section class="card" id="card">
+      <header class="card-head">
+        <p class="eyebrow">Framer Site Tool</p>
+        <h1 class="title">Pull <em>&amp;</em> Clean</h1>
+        <p class="subtitle">Mirror a Framer site, sanitize it, and validate every link.</p>
+      </header>
 
       <form id="pull-form" class="form">
         <div class="field">
@@ -26,8 +28,9 @@
       </form>
 
       <div class="progress" id="progress" hidden>
-        <div class="progress-track"><div class="progress-bar"></div></div>
+        <div class="spinner"></div>
         <p class="progress-stage" id="progress-stage">Queued&hellip;</p>
+        <p class="progress-hint" id="progress-hint" hidden></p>
       </div>
 
       <div class="report" id="report" hidden>
@@ -41,6 +44,8 @@
       </div>
 
       <p class="error" id="error-msg" hidden></p>
+
+      <footer class="card-foot">Mirrors, sanitizes, and validates Framer-published sites.</footer>
     </section>
   </main>
   <script src="script.js"></script>

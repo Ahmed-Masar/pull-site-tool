@@ -1,9 +1,17 @@
 const API_BASE = "https://pull-site-tool.onrender.com";
 
+const COLD_START_HINT_DELAY = 4000;
+const COLD_START_HINT_TEXT =
+  "This runs on a free server that sleeps when idle — it can take up to 50 seconds to wake up. Please wait…";
+const MAX_START_RETRIES = 5;
+const START_RETRY_DELAY = 6000;
+const MAX_POLL_FAILURES = 5;
+
 const form = document.getElementById("pull-form");
 const submitBtn = document.getElementById("submit-btn");
 const progressEl = document.getElementById("progress");
 const progressStageEl = document.getElementById("progress-stage");
+const progressHintEl = document.getElementById("progress-hint");
 const reportEl = document.getElementById("report");
 const reportStatusEl = document.getElementById("report-status");
 const reportListEl = document.getElementById("report-list");
@@ -13,6 +21,7 @@ const resetBtn = document.getElementById("reset-btn");
 const errorEl = document.getElementById("error-msg");
 
 let pollTimer = null;
+let pollFailures = 0;
 
 function showError(msg) {
   errorEl.textContent = msg;
@@ -21,10 +30,12 @@ function showError(msg) {
 
 function resetUI() {
   if (pollTimer) clearInterval(pollTimer);
+  pollFailures = 0;
   form.reset();
   form.hidden = false;
   submitBtn.disabled = false;
   progressEl.hidden = true;
+  progressHintEl.hidden = true;
   reportEl.hidden = true;
   errorEl.hidden = true;
   reportListEl.innerHTML = "";
@@ -107,11 +118,21 @@ function renderReport(job) {
   previewLink.href = `${API_BASE}/preview/${report.project_name}/`;
 }
 
+function failStart(message) {
+  progressEl.hidden = true;
+  progressHintEl.hidden = true;
+  form.hidden = false;
+  submitBtn.disabled = false;
+  showError(message);
+}
+
 async function pollStatus(jobId) {
   try {
     const res = await fetch(`${API_BASE}/api/status/${jobId}`);
     if (!res.ok) throw new Error(`Status check failed (${res.status})`);
     const job = await res.json();
+    pollFailures = 0;
+    progressHintEl.hidden = true;
 
     if (job.status === "pending" || job.status === "running") {
       progressStageEl.textContent = job.stage || "Working…";
@@ -121,18 +142,56 @@ async function pollStatus(jobId) {
     clearInterval(pollTimer);
     renderReport(job);
   } catch (err) {
-    clearInterval(pollTimer);
-    progressEl.hidden = true;
-    form.hidden = false;
-    submitBtn.disabled = false;
-    showError(err.message);
+    pollFailures += 1;
+    if (pollFailures >= MAX_POLL_FAILURES) {
+      clearInterval(pollTimer);
+      failStart(err.message);
+    } else {
+      progressStageEl.textContent = "Reconnecting…";
+    }
   }
 }
 
-form.addEventListener("submit", async (e) => {
+async function startPull(url, projectName) {
+  const coldStartTimer = setTimeout(() => {
+    progressHintEl.textContent = COLD_START_HINT_TEXT;
+    progressHintEl.hidden = false;
+  }, COLD_START_HINT_DELAY);
+
+  for (let attempt = 0; attempt < MAX_START_RETRIES; attempt += 1) {
+    try {
+      const res = await fetch(`${API_BASE}/api/pull-site`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, project_name: projectName || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+
+      clearTimeout(coldStartTimer);
+      progressHintEl.hidden = true;
+      pollTimer = setInterval(() => pollStatus(data.job_id), 1500);
+      pollStatus(data.job_id);
+      return;
+    } catch (err) {
+      const isLastAttempt = attempt === MAX_START_RETRIES - 1;
+      if (isLastAttempt) {
+        clearTimeout(coldStartTimer);
+        failStart(err.message);
+        return;
+      }
+      progressHintEl.textContent = `${COLD_START_HINT_TEXT} (retry ${attempt + 1}/${MAX_START_RETRIES - 1})`;
+      progressHintEl.hidden = false;
+      await new Promise((resolve) => setTimeout(resolve, START_RETRY_DELAY));
+    }
+  }
+}
+
+form.addEventListener("submit", (e) => {
   e.preventDefault();
   errorEl.hidden = true;
   reportEl.hidden = true;
+  pollFailures = 0;
 
   const url = document.getElementById("url").value.trim();
   const projectName = document.getElementById("project_name").value.trim();
@@ -140,25 +199,10 @@ form.addEventListener("submit", async (e) => {
   submitBtn.disabled = true;
   form.hidden = true;
   progressEl.hidden = false;
+  progressHintEl.hidden = true;
   progressStageEl.textContent = "Starting…";
 
-  try {
-    const res = await fetch(`${API_BASE}/api/pull-site`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, project_name: projectName || undefined }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
-
-    pollTimer = setInterval(() => pollStatus(data.job_id), 1500);
-    pollStatus(data.job_id);
-  } catch (err) {
-    progressEl.hidden = true;
-    form.hidden = false;
-    submitBtn.disabled = false;
-    showError(err.message);
-  }
+  startPull(url, projectName);
 });
 
 resetBtn.addEventListener("click", resetUI);
