@@ -205,10 +205,11 @@ def list_github_repos(token):
 
 def push_project_to_github(project_dir, repo_full_name, default_branch, source_url, token, log=lambda msg: None):
     mirror_root = pull_site.discover_mirror_root(project_dir)
+    remote_url = f"https://x-access-token:{token}@github.com/{repo_full_name}.git"
 
-    def run(cmd):
+    def run(cmd, check=True):
         result = subprocess.run(cmd, cwd=mirror_root, capture_output=True, text=True)
-        if result.returncode != 0:
+        if check and result.returncode != 0:
             stderr = result.stderr.replace(token, "***").strip()
             raise RuntimeError(f"`{' '.join(cmd[:2])}` failed: {stderr}")
         return result
@@ -216,16 +217,27 @@ def push_project_to_github(project_dir, repo_full_name, default_branch, source_u
     log("Preparing git repository...")
     if not os.path.isdir(os.path.join(mirror_root, ".git")):
         run(["git", "init", "-q"])
-    run(["git", "checkout", "-B", default_branch])
+
+    log("Fetching existing history...")
+    fetch_result = run(["git", "fetch", remote_url, default_branch], check=False)
+    parent_sha = run(["git", "rev-parse", "FETCH_HEAD"]).stdout.strip() if fetch_result.returncode == 0 else None
+
+    # Stage the freshly pulled files and graft them onto the existing remote history
+    # (instead of `git checkout`-ing to the old tree, which would overwrite the new files).
     run(["git", "add", "-A"])
-    run([
+    tree_sha = run(["git", "write-tree"]).stdout.strip()
+    commit_cmd = [
         "git", "-c", f"user.name={GIT_AUTHOR_NAME}", "-c", f"user.email={GIT_AUTHOR_EMAIL}",
-        "commit", "-m", f"Pull & clean: {source_url}", "--allow-empty",
-    ])
+        "commit-tree", tree_sha,
+    ]
+    if parent_sha:
+        commit_cmd += ["-p", parent_sha]
+    commit_cmd += ["-m", f"Pull & clean: {source_url}"]
+    commit_sha = run(commit_cmd).stdout.strip()
+    run(["git", "update-ref", f"refs/heads/{default_branch}", commit_sha])
 
     log(f"Pushing to {repo_full_name}...")
-    remote_url = f"https://x-access-token:{token}@github.com/{repo_full_name}.git"
-    run(["git", "push", "--force", remote_url, f"HEAD:{default_branch}"])
+    run(["git", "push", "--force", remote_url, f"{default_branch}:{default_branch}"])
 
     return f"https://github.com/{repo_full_name}"
 
