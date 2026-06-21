@@ -5,7 +5,8 @@ app.py - Flask API wrapping pull_site.py's download+cleanup pipeline.
 Endpoints:
     POST /api/pull-site             {"url": "...", "project_name": "..."} -> starts a background job
     GET  /api/status/<job_id>       -> job status + report once finished
-    GET  /api/github/repos          -> lists repos on the account owning GITHUB_TOKEN
+    GET  /api/github/repos          -> lists repos on GITHUB_ORG (org), or on the account owning
+                                        GITHUB_TOKEN if GITHUB_ORG is unset
     POST /api/push-to-github        {"project_name", "repo", "default_branch", "url"} -> starts a background push job
     GET  /api/push-status/<job_id>  -> push job status
     GET  /preview/<project>/        -> serves the cleaned mirror for manual browsing
@@ -176,10 +177,14 @@ def _github_api_get(path, token):
 
 
 def list_github_repos(token):
+    org = os.environ.get("GITHUB_ORG")
+    path_base = f"/orgs/{org}/repos" if org else "/user/repos?affiliation=owner"
+    sep = "&" if "?" in path_base else "?"
+
     repos = []
     page = 1
     while page <= 5:
-        data = _github_api_get(f"/user/repos?affiliation=owner&per_page=100&page={page}&sort=updated", token)
+        data = _github_api_get(f"{path_base}{sep}per_page=100&page={page}&sort=updated", token)
         if not data:
             break
         repos.extend(data)
