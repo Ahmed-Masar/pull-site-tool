@@ -203,7 +203,7 @@ def list_github_repos(token):
     ]
 
 
-def push_project_to_github(project_dir, repo_full_name, default_branch, source_url, token, log=lambda msg: None):
+def push_project_to_github(project_dir, repo_full_name, default_branch, source_url, token, commit_message=None, log=lambda msg: None):
     mirror_root = pull_site.discover_mirror_root(project_dir)
     remote_url = f"https://x-access-token:{token}@github.com/{repo_full_name}.git"
 
@@ -232,7 +232,7 @@ def push_project_to_github(project_dir, repo_full_name, default_branch, source_u
     ]
     if parent_sha:
         commit_cmd += ["-p", parent_sha]
-    commit_cmd += ["-m", f"Pull & clean: {source_url}"]
+    commit_cmd += ["-m", commit_message or f"Pull & clean: {source_url}"]
     commit_sha = run(commit_cmd).stdout.strip()
     run(["git", "update-ref", f"refs/heads/{default_branch}", commit_sha])
 
@@ -321,7 +321,7 @@ def github_repos():
     return jsonify(repos=repos)
 
 
-def _run_push_job(job_id, project_name, repo_full_name, default_branch, source_url):
+def _run_push_job(job_id, project_name, repo_full_name, default_branch, source_url, commit_message=None):
     with push_jobs_lock:
         push_jobs[job_id]["status"] = "running"
 
@@ -332,7 +332,10 @@ def _run_push_job(job_id, project_name, repo_full_name, default_branch, source_u
     try:
         token = _github_token()
         project_dir = os.path.join(SITES_DIR, project_name)
-        repo_url = push_project_to_github(project_dir, repo_full_name, default_branch, source_url, token, log=log)
+        repo_url = push_project_to_github(
+            project_dir, repo_full_name, default_branch, source_url, token,
+            commit_message=commit_message, log=log,
+        )
         with push_jobs_lock:
             push_jobs[job_id]["status"] = "done"
             push_jobs[job_id]["repo_url"] = repo_url
@@ -351,6 +354,7 @@ def push_to_github_endpoint():
     repo_full_name = data.get("repo")
     default_branch = data.get("default_branch") or "main"
     source_url = data.get("url") or ""
+    commit_message = (data.get("commit_message") or "").strip() or None
 
     if not project_name or not PROJECT_NAME_RE.match(project_name):
         return jsonify(error="a valid project_name is required"), 400
@@ -372,7 +376,7 @@ def push_to_github_endpoint():
 
     thread = threading.Thread(
         target=_run_push_job,
-        args=(job_id, project_name, repo_full_name, default_branch, source_url),
+        args=(job_id, project_name, repo_full_name, default_branch, source_url, commit_message),
         daemon=True,
     )
     thread.start()
